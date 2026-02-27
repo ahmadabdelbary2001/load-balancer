@@ -1,6 +1,5 @@
 // load-balncer-with-rust/src/lb/manager.rs
-
-use crate::lb::server::Server;
+use crate::lb::core::server::Server;
 use crate::lb::strategy::Strategy;
 use std::sync::Arc;
 

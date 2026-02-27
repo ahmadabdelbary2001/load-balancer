@@ -1,9 +1,7 @@
 // load-balncer-with-rust/src/lb/server.rs
-
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 // Server struct represents a backend server.
-// It uses atomic types for thread-safe shared state.
 pub struct Server {
     pub host: String,
     pub max_connections: usize,

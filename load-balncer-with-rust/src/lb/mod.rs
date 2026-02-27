@@ -1,9 +1,7 @@
-// load-balncer-with-rust/src/lb/mod.rs
-
-pub mod manager;
-pub mod server;
+// src/lb/mod.rs
+pub mod core;
 pub mod strategy;
 
-pub use manager::LoadBalancer;
-pub use server::Server;
+// Re-export common types for a clean API (SOLID)
+pub use core::{LoadBalancer, Server};
 pub use strategy::{RoundRobin, Strategy};
