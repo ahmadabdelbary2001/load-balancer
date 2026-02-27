@@ -6,11 +6,11 @@ health_check_interval: "5s"
 
 # Multiple listeners — each with its own mode and algorithm
 listeners:
-  - listen_addr: ":8000"
+  - listen_addr: "0.0.0.0:8000"
     mode: "http"              # HTTP Layer 7 load balancing
     algorithm: "round_robin"  # Distribute requests in order
 
-  - listen_addr: ":9000"
+  - listen_addr: "0.0.0.0:9000"
     mode: "tcp"               # TCP Layer 4 load balancing
     algorithm: "least_connections"  # Route to server with fewest active connections
 

@@ -3,7 +3,7 @@
 mod config;
 mod lb;
 
-use lb::{LoadBalancer, RoundRobin, Server};
+use lb::{LeastConnections, LoadBalancer, RoundRobin, Server};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -44,6 +44,7 @@ async fn main() {
         // SOLID: Choose strategy based on config
         let strategy: Box<dyn lb::Strategy> = match algo.as_str() {
             "round_robin" => Box::new(RoundRobin::new()),
+            "least_connections" => Box::new(LeastConnections::new()),
             _ => {
                 println!(
                     "WARNING: Algorithm '{}' not implemented, falling back to RoundRobin",
@@ -65,9 +66,14 @@ async fn main() {
         tokio::spawn(async move {
             let addr_str = addr.clone();
             match listener_cfg.mode.as_str() {
-                "tcp" | "http" => {
+                "http" => {
+                    if let Err(e) = lb::start_http_listener(addr, lb).await {
+                        eprintln!("HTTP LISTENER ERROR {}: {}", addr_str, e);
+                    }
+                }
+                "tcp" => {
                     if let Err(e) = lb::start_tcp_listener(addr, lb).await {
-                        eprintln!("LISTENER ERROR {}: {}", addr_str, e);
+                        eprintln!("TCP LISTENER ERROR {}: {}", addr_str, e);
                     }
                 }
                 _ => eprintln!("UNSUPPORTED MODE: {}", listener_cfg.mode),
