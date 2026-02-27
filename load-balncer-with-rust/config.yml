@@ -1,0 +1,29 @@
+# Load Balancer Configuration
+# Mirrors the structure of load-balancer/config.yml (Go version)
+
+# How often to check backend server health via TCP dial
+health_check_interval: "5s"
+
+# Multiple listeners — each with its own mode and algorithm
+listeners:
+  - listen_addr: ":8000"
+    mode: "http"              # HTTP Layer 7 load balancing
+    algorithm: "round_robin"  # Distribute requests in order
+
+  - listen_addr: ":9000"
+    mode: "tcp"               # TCP Layer 4 load balancing
+    algorithm: "least_connections"  # Route to server with fewest active connections
+
+# Backend servers shared across all listeners
+servers:
+  - host: "localhost:9001"
+    max_connections: 100      # Max simultaneous connections allowed
+    mode: "http"
+
+  - host: "localhost:9002"
+    max_connections: 100
+    mode: "http"
+
+  - host: "localhost:9003"
+    max_connections: 100
+    mode: "http"
