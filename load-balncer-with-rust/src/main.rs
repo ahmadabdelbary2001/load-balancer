@@ -1,69 +1,82 @@
+// load-balncer-with-rust/src/main.rs
+
 mod config;
 mod lb;
 
 use lb::{LoadBalancer, RoundRobin, Server};
 use std::sync::Arc;
+use std::time::Duration;
 
-fn main() {
-    // Stage 1: Load and display configuration
+#[tokio::main]
+async fn main() {
+    // Stage 1: Load configuration
     let cfg = config::load_config("config.yml").expect("Failed to load config.yml");
 
-    println!("--- Load Balancer Initialized ---");
+    println!("--- Multi-Protocol Load Balancer Started ---");
     println!("Health Check Interval: {}", cfg.health_check_interval);
-
-    // Demonstrate listener usage to fix warnings
-    for listener in &cfg.listeners {
-        println!(
-            "Configuration: Listening on {} (Mode: {}, Algorithm: {})",
-            listener.listen_addr, listener.mode, listener.algorithm
-        );
-    }
 
     // Stage 2: Initialize server pool
     let mut servers = Vec::new();
     for s_cfg in &cfg.servers {
-        // Use all server config fields
         println!(
-            "Server added: {} (mode: {}, max_conn: {})",
+            "CONFIG: Backend Server {} (Mode: {}, Max Conns: {})",
             s_cfg.host, s_cfg.mode, s_cfg.max_connections
         );
         let server = Arc::new(Server::new(s_cfg.host.clone(), s_cfg.max_connections));
         servers.push(server);
     }
 
-    // Setup the selection strategy (Round Robin)
-    let strategy = Box::new(RoundRobin::new());
+    // Wrap servers for health check sharing
+    let shared_servers = servers.clone();
 
-    // Create the LoadBalancer instance
-    let lb = LoadBalancer::new(servers, strategy);
+    // Stage 3: Start Health Checks (Background)
+    let health_interval = Duration::from_secs(5);
+    tokio::spawn(async move {
+        lb::start_health_checks(shared_servers, health_interval).await;
+    });
 
-    // Verify server list access
-    println!("Total backend servers: {}", lb.get_servers().len());
+    // Stage 4: Start Listeners based on config
+    for listener_cfg in cfg.listeners {
+        let pool = servers.clone();
+        let addr = listener_cfg.listen_addr.clone();
+        let algo = listener_cfg.algorithm.clone();
 
-    println!("\n--- Load Balancer Selection & Connection Demo ---");
-    for i in 1..=6 {
-        if let Some(s) = lb.select_server() {
-            // Demonstrate connection tracking
-            s.increment_connections();
-
-            println!(
-                "Request {}: Target -> {} | Active Conns: {}/{} | Healthy: {}",
-                i,
-                s.host,
-                s.get_active_connections(),
-                s.max_connections,
-                s.is_healthy()
-            );
-
-            // Simulation: Update health or connections
-            if i % 3 == 0 {
-                println!("  (Simulating health status change for {})", s.host);
-                s.set_healthy(false);
+        // SOLID: Choose strategy based on config
+        let strategy: Box<dyn lb::Strategy> = match algo.as_str() {
+            "round_robin" => Box::new(RoundRobin::new()),
+            _ => {
+                println!(
+                    "WARNING: Algorithm '{}' not implemented, falling back to RoundRobin",
+                    algo
+                );
+                Box::new(RoundRobin::new())
             }
+        };
 
-            s.decrement_connections();
-        } else {
-            println!("Request {}: Error - No healthy servers", i);
-        }
+        let lb = Arc::new(LoadBalancer::new(pool, strategy));
+        println!(
+            "STARTUP: Listener on {} (Mode: {}, Algo: {}) - Pool size: {}",
+            addr,
+            listener_cfg.mode,
+            algo,
+            lb.get_servers().len()
+        );
+
+        tokio::spawn(async move {
+            let addr_str = addr.clone();
+            match listener_cfg.mode.as_str() {
+                "tcp" | "http" => {
+                    if let Err(e) = lb::start_tcp_listener(addr, lb).await {
+                        eprintln!("LISTENER ERROR {}: {}", addr_str, e);
+                    }
+                }
+                _ => eprintln!("UNSUPPORTED MODE: {}", listener_cfg.mode),
+            }
+        });
+    }
+
+    // Keep the main task alive
+    loop {
+        tokio::time::sleep(Duration::from_secs(3600)).await;
     }
 }
