@@ -1,26 +1,44 @@
 // load-balncer-with-rust/src/main.rs
 
 mod config;
+mod lb;
+
+use lb::{RoundRobin, Server};
 
 fn main() {
+    // Load config from file
     let cfg = config::load_config("config.yml").expect("Failed to load config.yml");
 
-    println!("Loaded config:");
-    println!("  health_check_interval: {}", cfg.health_check_interval);
-    println!("  listeners: {}", cfg.listeners.len());
-    println!("  servers: {}", cfg.servers.len());
+    println!("Loaded config successfully.");
+    println!("Health Check Interval: {}", cfg.health_check_interval);
 
-    for listener in &cfg.listeners {
+    // Initialize servers from config to fix dead code warnings
+    let mut servers = Vec::new();
+    for s_cfg in &cfg.servers {
         println!(
-            "  [Listener] {} | mode={} | algorithm={}",
-            listener.listen_addr, listener.mode, listener.algorithm
+            "Found server: {} (mode: {}, max_conn: {})",
+            s_cfg.host, s_cfg.mode, s_cfg.max_connections
         );
+        servers.push(Server::new(s_cfg.host.clone()));
     }
 
-    for server in &cfg.servers {
+    let lb = RoundRobin::new();
+
+    // Demonstrate listener config usage
+    let algo_name = if let Some(l) = cfg.listeners.first() {
         println!(
-            "  [Server] {} | max_conn={} | mode={}",
-            server.host, server.max_connections, server.mode
+            "\nPrimary Listener: {} | Mode: {} | Algorithm: {}",
+            l.listen_addr, l.mode, l.algorithm
         );
+        l.algorithm.as_str()
+    } else {
+        "round_robin"
+    };
+
+    println!("\n--- Algorithm Demo ({}) ---", algo_name);
+    for i in 1..=6 {
+        if let Some(s) = lb.select(&servers) {
+            println!("Request {}: Route to {}", i, s.host);
+        }
     }
 }
