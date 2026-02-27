@@ -1,44 +1,69 @@
-// load-balncer-with-rust/src/main.rs
-
 mod config;
 mod lb;
 
-use lb::{RoundRobin, Server};
+use lb::{LoadBalancer, RoundRobin, Server};
+use std::sync::Arc;
 
 fn main() {
-    // Load config from file
+    // Stage 1: Load and display configuration
     let cfg = config::load_config("config.yml").expect("Failed to load config.yml");
 
-    println!("Loaded config successfully.");
+    println!("--- Load Balancer Initialized ---");
     println!("Health Check Interval: {}", cfg.health_check_interval);
 
-    // Initialize servers from config to fix dead code warnings
-    let mut servers = Vec::new();
-    for s_cfg in &cfg.servers {
+    // Demonstrate listener usage to fix warnings
+    for listener in &cfg.listeners {
         println!(
-            "Found server: {} (mode: {}, max_conn: {})",
-            s_cfg.host, s_cfg.mode, s_cfg.max_connections
+            "Configuration: Listening on {} (Mode: {}, Algorithm: {})",
+            listener.listen_addr, listener.mode, listener.algorithm
         );
-        servers.push(Server::new(s_cfg.host.clone()));
     }
 
-    let lb = RoundRobin::new();
-
-    // Demonstrate listener config usage
-    let algo_name = if let Some(l) = cfg.listeners.first() {
+    // Stage 2: Initialize server pool
+    let mut servers = Vec::new();
+    for s_cfg in &cfg.servers {
+        // Use all server config fields
         println!(
-            "\nPrimary Listener: {} | Mode: {} | Algorithm: {}",
-            l.listen_addr, l.mode, l.algorithm
+            "Server added: {} (mode: {}, max_conn: {})",
+            s_cfg.host, s_cfg.mode, s_cfg.max_connections
         );
-        l.algorithm.as_str()
-    } else {
-        "round_robin"
-    };
+        let server = Arc::new(Server::new(s_cfg.host.clone(), s_cfg.max_connections));
+        servers.push(server);
+    }
 
-    println!("\n--- Algorithm Demo ({}) ---", algo_name);
+    // Setup the selection strategy (Round Robin)
+    let strategy = Box::new(RoundRobin::new());
+
+    // Create the LoadBalancer instance
+    let lb = LoadBalancer::new(servers, strategy);
+
+    // Verify server list access
+    println!("Total backend servers: {}", lb.get_servers().len());
+
+    println!("\n--- Load Balancer Selection & Connection Demo ---");
     for i in 1..=6 {
-        if let Some(s) = lb.select(&servers) {
-            println!("Request {}: Route to {}", i, s.host);
+        if let Some(s) = lb.select_server() {
+            // Demonstrate connection tracking
+            s.increment_connections();
+
+            println!(
+                "Request {}: Target -> {} | Active Conns: {}/{} | Healthy: {}",
+                i,
+                s.host,
+                s.get_active_connections(),
+                s.max_connections,
+                s.is_healthy()
+            );
+
+            // Simulation: Update health or connections
+            if i % 3 == 0 {
+                println!("  (Simulating health status change for {})", s.host);
+                s.set_healthy(false);
+            }
+
+            s.decrement_connections();
+        } else {
+            println!("Request {}: Error - No healthy servers", i);
         }
     }
 }
