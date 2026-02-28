@@ -11,12 +11,21 @@ pub struct Config {
     pub servers: Vec<ServerConfig>,
 }
 
-// Defines one listening endpoint (HTTP or TCP)
+// One listening endpoint (HTTP or TCP)
 #[derive(Debug, Deserialize, Clone)]
 pub struct ListenerConfig {
-    pub listen_addr: String, // e.g. ":8000"
-    pub mode: String,        // "http" or "tcp"
-    pub algorithm: String,   // "round_robin" or "least_connections"
+    pub listen_addr: String,
+    pub mode: String,
+    pub algorithm: String,
+    pub acls: Option<Vec<AclConfig>>, // Optional path-based routing rules
+}
+
+// Path-based routing rule
+#[derive(Debug, Deserialize, Clone)]
+pub struct AclConfig {
+    pub name: String,
+    pub pattern: String,           // Path ending (e.g., "/even")
+    pub target_hosts: Vec<String>, // Target server hostnames
 }
 
 // Defines one backend server

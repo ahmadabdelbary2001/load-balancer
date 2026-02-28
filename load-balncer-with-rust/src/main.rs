@@ -54,7 +54,11 @@ async fn main() {
             }
         };
 
-        let lb = Arc::new(LoadBalancer::new(pool, strategy));
+        let lb = Arc::new(LoadBalancer::new(
+            pool,
+            strategy,
+            listener_cfg.acls.unwrap_or_default(),
+        ));
         println!(
             "STARTUP: Listener on {} (Mode: {}, Algo: {}) - Pool size: {}",
             addr,

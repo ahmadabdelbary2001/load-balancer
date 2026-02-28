@@ -25,7 +25,8 @@ pub async fn start_tcp_listener(addr: String, lb: Arc<LoadBalancer>) -> io::Resu
             let mut connection_successful = false;
 
             while attempts < max_retries && !connection_successful {
-                if let Some(server) = lb_ref.select_server() {
+                // TCP Proxy uses default selection (no path available)
+                if let Some(server) = lb_ref.select_server_with_path("") {
                     let target_host = server.host.clone();
 
                     // Capacity Guard: Check if server is overloaded
@@ -119,9 +120,9 @@ async fn handle_http_request(
     };
 
     while attempts < max_retries {
-        if let Some(server) = lb.select_server() {
+        let path = parts.uri.path().to_string();
+        if let Some(server) = lb.select_server_with_path(&path) {
             let target_host = server.host.clone();
-            let path = parts.uri.path().to_string();
 
             // Capacity Guard: Check if server is overloaded
             if server.get_active_connections() >= server.max_connections {

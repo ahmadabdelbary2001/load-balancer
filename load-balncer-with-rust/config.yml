@@ -7,8 +7,15 @@ health_check_interval: "5s"
 # Multiple listeners — each with its own mode and algorithm
 listeners:
   - listen_addr: "0.0.0.0:8000"
-    mode: "http"              # HTTP Layer 7 load balancing
-    algorithm: "weighted_round_robin"  # Distribute requests in order
+    mode: "http"
+    algorithm: "weighted_round_robin"
+    acls:
+      - name: "even_path"
+        pattern: "/even"
+        target_hosts: ["localhost:9002"]
+      - name: "odd_path"
+        pattern: "/odd"
+        target_hosts: ["localhost:9001", "localhost:9003"]
 
   - listen_addr: "0.0.0.0:9000"
     mode: "tcp"               # TCP Layer 4 load balancing
