@@ -21,6 +21,13 @@ impl Strategy for LeastConnections {
             return None;
         }
 
+        // Log all healthy servers and their current counts
+        let counts: Vec<String> = healthy
+            .iter()
+            .map(|s| format!("{}({})", s.host, s.get_active_connections()))
+            .collect();
+        println!("STRATEGY (LeastConnections): Current Pool: {:?}", counts);
+
         let selected = healthy
             .iter()
             .min_by_key(|s| s.get_active_connections())
@@ -28,9 +35,8 @@ impl Strategy for LeastConnections {
 
         if let Some(s) = selected {
             println!(
-                "STRATEGY (LeastConnections): Selected {} (Active Conns: {})",
-                s.host,
-                s.get_active_connections()
+                "STRATEGY (LeastConnections): Winner -> {} (chosen because it has the fewest connections)",
+                s.host
             );
         }
 
