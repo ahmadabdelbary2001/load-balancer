@@ -27,26 +27,36 @@ pub async fn start_tcp_listener(addr: String, lb: Arc<LoadBalancer>) -> io::Resu
             while attempts < max_retries && !connection_successful {
                 if let Some(server) = lb_ref.select_server() {
                     let target_host = server.host.clone();
+
+                    // Capacity Guard: Check if server is overloaded
+                    if server.get_active_connections() >= server.max_connections {
+                        println!(
+                            "L4 PROXY [TCP]: Server {} BUSY ({}/{}), retrying another...",
+                            target_host,
+                            server.get_active_connections(),
+                            server.max_connections
+                        );
+                        continue;
+                    }
+
                     server.increment_connections();
                     attempts += 1;
 
                     println!(
-                        "L4 PROXY: Attempt {} | Routing {} -> {} [Load: {}/{}]",
-                        attempts,
-                        client_addr,
-                        target_host,
-                        server.get_active_connections(),
-                        server.max_connections
+                        "L4 PROXY [TCP]: Attempt {}/{} | Client {} -> {}",
+                        attempts, max_retries, client_addr, target_host
                     );
 
                     match TcpStream::connect(&target_host).await {
                         Ok(mut backend) => {
+                            println!("L4 PROXY [TCP]: SUCCESS - Connected to {}", target_host);
                             connection_successful = true;
                             let _ = io::copy_bidirectional(&mut client, &mut backend).await;
+                            println!("L4 PROXY [TCP]: CLOSED connection to {}", target_host);
                         }
                         Err(e) => {
                             eprintln!(
-                                "L4 PROXY ERROR: Failed to connect to {} ({}).",
+                                "L4 PROXY ERROR [TCP]: Failed to connect to {} ({}). Marking UNHEALTHY.",
                                 target_host, e
                             );
                             server.set_healthy(false);
@@ -54,6 +64,7 @@ pub async fn start_tcp_listener(addr: String, lb: Arc<LoadBalancer>) -> io::Resu
                     }
                     server.decrement_connections();
                 } else {
+                    println!("L4 PROXY [TCP]: No available servers for selection.");
                     break;
                 }
             }
@@ -110,12 +121,25 @@ async fn handle_http_request(
     while attempts < max_retries {
         if let Some(server) = lb.select_server() {
             let target_host = server.host.clone();
+            let path = parts.uri.path().to_string();
+
+            // Capacity Guard: Check if server is overloaded
+            if server.get_active_connections() >= server.max_connections {
+                println!(
+                    "L7 PROXY [HTTP]: Server {} BUSY ({}/{}), retrying another...",
+                    target_host,
+                    server.get_active_connections(),
+                    server.max_connections
+                );
+                continue;
+            }
+
             server.increment_connections();
             attempts += 1;
 
             println!(
-                "L7 PROXY: Request {} -> {} [LB: {}]",
-                client_ip, target_host, attempts
+                "L7 PROXY: Request {} -> {} [Path: {}] [Attempt: {}]",
+                client_ip, target_host, path, attempts
             );
 
             match TcpStream::connect(&target_host).await {
@@ -150,7 +174,20 @@ async fn handle_http_request(
                                     };
                                     let mut res_builder = Response::builder()
                                         .status(resp_parts.status)
-                                        .version(resp_parts.version);
+                                        .version(resp_parts.version)
+                                        // Prevents browser from caching the response so rotation is visible
+                                        .header(
+                                            "Cache-Control",
+                                            "no-cache, no-store, must-revalidate",
+                                        )
+                                        .header("Pragma", "no-cache")
+                                        // Diagnostic headers to solve the user's "staying on same server" mystery
+                                        .header("X-Backend-Server", &target_host)
+                                        .header(
+                                            "X-Selection-Log",
+                                            format!("Attempt #{}", attempts),
+                                        );
+
                                     for (key, value) in resp_parts.headers.iter() {
                                         res_builder = res_builder.header(key, value);
                                     }

@@ -24,7 +24,7 @@ pub struct ListenerConfig {
 pub struct ServerConfig {
     pub host: String,           // e.g. "localhost:9001"
     pub max_connections: usize, // max allowed concurrent connections
-    pub mode: String,           // "http" or "tcp"
+    pub weight: Option<usize>,  // Optional weight (default is 1)
 }
 
 // Reads and parses config.yml

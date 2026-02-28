@@ -14,9 +14,26 @@ impl LeastConnections {
 
 impl Strategy for LeastConnections {
     fn select<'a>(&self, servers: &'a [Arc<Server>]) -> Option<&'a Arc<Server>> {
-        servers
+        let healthy: Vec<&Arc<Server>> = servers.iter().filter(|s| s.is_healthy()).collect();
+
+        if healthy.is_empty() {
+            println!("STRATEGY (LeastConnections): No healthy servers available.");
+            return None;
+        }
+
+        let selected = healthy
             .iter()
-            .filter(|s| s.is_healthy())
             .min_by_key(|s| s.get_active_connections())
+            .cloned();
+
+        if let Some(s) = selected {
+            println!(
+                "STRATEGY (LeastConnections): Selected {} (Active Conns: {})",
+                s.host,
+                s.get_active_connections()
+            );
+        }
+
+        selected
     }
 }

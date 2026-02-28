@@ -8,7 +8,7 @@ health_check_interval: "5s"
 listeners:
   - listen_addr: "0.0.0.0:8000"
     mode: "http"              # HTTP Layer 7 load balancing
-    algorithm: "round_robin"  # Distribute requests in order
+    algorithm: "weighted_round_robin"  # Distribute requests in order
 
   - listen_addr: "0.0.0.0:9000"
     mode: "tcp"               # TCP Layer 4 load balancing
@@ -19,11 +19,14 @@ servers:
   - host: "localhost:9001"
     max_connections: 100      # Max simultaneous connections allowed
     mode: "http"
+    weight: 1
 
   - host: "localhost:9002"
     max_connections: 100
     mode: "http"
+    weight: 2
 
   - host: "localhost:9003"
     max_connections: 100
     mode: "http"
+    weight: 2

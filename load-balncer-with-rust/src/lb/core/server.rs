@@ -3,17 +3,19 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 // Server struct represents a backend server.
 pub struct Server {
-    pub host: String,
-    pub max_connections: usize,
+    pub host: String,           // Hostname and port
+    pub max_connections: usize, // Connection limit
+    pub weight: usize,          // Priority weight
     active_connections: AtomicUsize,
     healthy: AtomicBool,
 }
 
 impl Server {
-    pub fn new(host: String, max_connections: usize) -> Self {
+    pub fn new(host: String, max_connections: usize, weight: usize) -> Self {
         Self {
             host,
             max_connections,
+            weight,
             active_connections: AtomicUsize::new(0),
             healthy: AtomicBool::new(true),
         }

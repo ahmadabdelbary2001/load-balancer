@@ -1,9 +1,8 @@
-// load-balncer-with-rust/src/main.rs
-
 mod config;
 mod lb;
 
-use lb::{LeastConnections, LoadBalancer, RoundRobin, Server};
+// Load core parts from lb module
+use lb::{LoadBalancer, Server};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -18,11 +17,11 @@ async fn main() {
     // Stage 2: Initialize server pool
     let mut servers = Vec::new();
     for s_cfg in &cfg.servers {
-        println!(
-            "CONFIG: Backend Server {} (Mode: {}, Max Conns: {})",
-            s_cfg.host, s_cfg.mode, s_cfg.max_connections
-        );
-        let server = Arc::new(Server::new(s_cfg.host.clone(), s_cfg.max_connections));
+        let server = Arc::new(Server::new(
+            s_cfg.host.clone(),
+            s_cfg.max_connections,
+            s_cfg.weight.unwrap_or(1),
+        ));
         servers.push(server);
     }
 
@@ -41,16 +40,17 @@ async fn main() {
         let addr = listener_cfg.listen_addr.clone();
         let algo = listener_cfg.algorithm.clone();
 
-        // SOLID: Choose strategy based on config
+        // Select the Load Balancing strategy
         let strategy: Box<dyn lb::Strategy> = match algo.as_str() {
-            "round_robin" => Box::new(RoundRobin::new()),
-            "least_connections" => Box::new(LeastConnections::new()),
+            "round_robin" => Box::new(lb::RoundRobin::new()),
+            "least_connections" => Box::new(lb::LeastConnections::new()),
+            "weighted_round_robin" => Box::new(lb::WeightedRoundRobin::new()),
             _ => {
                 println!(
                     "WARNING: Algorithm '{}' not implemented, falling back to RoundRobin",
                     algo
                 );
-                Box::new(RoundRobin::new())
+                Box::new(lb::RoundRobin::new())
             }
         };
 
