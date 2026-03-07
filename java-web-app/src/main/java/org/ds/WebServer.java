@@ -17,6 +17,7 @@ import java.util.concurrent.Executors;
 public class WebServer {
     private static final String STATUS_ENDPOINT = "/status";
     private static final String HOME_PAGE_ENDPOINT = "/";
+    private static final String HOLD_ENDPOINT = "/hold";
 
     private static final String HTML_PAGE = "/index.html";
 
@@ -39,6 +40,7 @@ public class WebServer {
 
         server.createContext(STATUS_ENDPOINT, this::handleStatusCheckRequest);
         server.createContext(HOME_PAGE_ENDPOINT, this::handleHomePageRequest);
+        server.createContext(HOLD_ENDPOINT, this::handleHoldRequest);
 
         server.setExecutor(Executors.newFixedThreadPool(8));
         System.out.println(String.format("Started server %s on port %d ", serverName, port));
@@ -84,9 +86,37 @@ public class WebServer {
      * @param document - original HTML document
      */
     private String modifyHtmlDocument(Document document) {
-        Element serverNameElement = document.selectFirst("#server_name");
-        serverNameElement.appendText(serverName);
+        Element serverNameElement = document.selectFirst(".server-name"); // Use class selector matching index.html
+        if (serverNameElement != null) {
+            serverNameElement.text(serverName);
+        }
         return document.toString();
+    }
+
+    private void handleHoldRequest(HttpExchange exchange) throws IOException {
+        String query = exchange.getRequestURI().getQuery();
+        int duration = 0;
+        if (query != null && query.contains("duration=")) {
+            try {
+                duration = Integer.parseInt(query.split("=")[1]);
+            } catch (NumberFormatException e) {
+                duration = 0;
+            }
+        }
+
+        System.out.println(String.format("%s: Holding connection for %d seconds...", serverName, duration));
+        
+        try {
+            if (duration > 0) {
+                Thread.sleep(duration * 1000L);
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        String response = "Connection released after " + duration + "s";
+        sendResponse(response.getBytes(), exchange);
+        System.out.println(String.format("%s: Connection released.", serverName));
     }
 
     private void handleStatusCheckRequest(HttpExchange exchange) throws IOException {

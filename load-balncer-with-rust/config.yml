@@ -19,7 +19,7 @@ listeners:
 
   - listen_addr: "0.0.0.0:9000"
     mode: "tcp"               # TCP Layer 4 load balancing
-    algorithm: "least_connections"  # Route to server with fewest active connections
+    algorithm: "weighted_round_robin"
 
 # Backend servers shared across all listeners
 servers:

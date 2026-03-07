@@ -58,7 +58,56 @@
 <body>
 <div class="container">
     <h1 class="welcome-title">Welcome to</h1>
-    <h1 class="server-name">{{.ServerName}}</h1>
+    <h1 class="server-name">Loading...</h1>
+    
+    <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+        <p style="color: #666;">Test TCP Persistence & Least Connections</p>
+        <div id="countdown-display" style="display: none; font-size: 48px; color: #e74c3c; margin: 20px 0;">0</div>
+        
+        <form id="hold-form" style="margin-top: 15px;">
+            <input type="number" id="duration" placeholder="Seconds" min="1" max="60" required 
+                   style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; width: 80px;">
+            <button type="submit" style="padding: 10px 20px; background: #2193b0; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Hold Connection
+            </button>
+        </form>
+    </div>
 </div>
+
+<script>
+    const form = document.getElementById('hold-form');
+    const display = document.getElementById('countdown-display');
+    const durationInput = document.getElementById('duration');
+
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const duration = parseInt(durationInput.value);
+        
+        // UI Updates
+        form.style.display = 'none';
+        display.style.display = 'block';
+        display.innerText = duration;
+
+        // Start local countdown
+        let timeLeft = duration;
+        const interval = setInterval(() => {
+            timeLeft--;
+            display.innerText = timeLeft;
+            if (timeLeft <= 0) clearInterval(interval);
+        }, 1000);
+
+        // Call the 'hold' endpoint - this keeps the network connection busy
+        try {
+            const response = await fetch(`/hold?duration=${duration}`);
+            const text = await response.text();
+            display.innerText = "Connection Ended";
+            display.style.color = "#2ecc71";
+            setTimeout(() => location.reload(), 2000);
+        } catch (err) {
+            display.innerText = "Error";
+            console.error(err);
+        }
+    };
+</script>
 </body>
 </html>
