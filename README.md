@@ -1,89 +1,87 @@
-# Go Load Balancer
+# مشروع موازن الأحمال المتعدد (Multi-Protocol Load Balancer Project)
 
-A simple yet efficient HTTP load balancer written in Go, designed to distribute incoming traffic across multiple backend servers using the **Least Connections** algorithm. Includes health checks and a custom 503 error page for handling server outages.
-
----
-
-## Features
-- **Least Connections Algorithm**: Distributes requests to the server with the fewest active connections.
-- **Health Checks**: Periodically verifies backend server health.
-- **Custom 503 Page**: Returns a user-friendly error page when all servers are unavailable.
-- **Concurrent Handling**: Efficiently manages multiple simultaneous requests.
-- **Configurable**: Easy setup via `config.json`.
+هذا المشروع عبارة عن مجموعة أدوات متكاملة لدراسة وتطبيق مفاهيم موازنة الأحمال (Load Balancing) في الأنظمة الموزعة. يتضمن المشروع موازنات أحمال متطورة بلغات مختلفة وتطبيقات خلفية (Backend) لمحاكاة سيناريوهات التشغيل الحقيقية.
 
 ---
 
-## Prerequisites
-- Go 1.23.2 or later
+## 🏗️ مكونات المشروع (Sub-Projects)
+
+### 1. موازن أحمال Rust المتطور (`/load-balncer-with-rust`)
+هو المكون الرئيسي والأكثر تقدماً في المشروع.
+- **الطبقات (Layers)**: يدعم L4 (TCP) و L7 (HTTP).
+- **الخوارزميات**: Weighted Round Robin, Least Connections, Round Robin.
+- **ACL Routing**: توجيه الطلبات بناءً على المسار (مثلاً `/even` و `/odd`).
+- **Health Checks**: فحص دوري لصحة السيرفرات.
+- **Config**: يتم التحكم به عبر `config.yml`.
+
+### 2. موازن أحمال Go المبسط (`/go-load-balancing`)
+نسخة تعليمية بسيطة تركز على موازنة HTTP.
+- **الخوارزمية**: Least Connections.
+- **الميزات**: فحص حالة السيرفرات، معالجة أخطاء 503.
+- **Config**: يتم التحكم به عبر `config.json`.
+
+### 3. تطبيق Java الخلفي المطوّر (`/java-web-app`)
+مصمم خصيصاً لاختبار خوارزمية Least Connections.
+- **المميزات**: يحتوي على واجهة رسومية وعداد تنازلي (Countdown Timer).
+- **نقطة وصول `/hold`**: تسمح بإبقاء الاتصال مفتوحاً لمدة محددة لمحاكاة ضغط الاتصالات.
+- **الملف الجاهز**: `out/artifacts/simpleWebApp_v2.jar`.
+
+### 4. تطبيق Go الخلفي الخفيف (`/go-web-app`)
+خادم ويب بسيط بلغة Go لأغراض الاختبار السريع.
 
 ---
 
-## Project Structure
+## 🚀 طريقة التشغيل (Setup & Execution)
+
+### أولاً: تشغيل السيرفرات الخلفية (Backends)
+يمكنك اختيار أي من السيرفرين (أو كلاهما معاً):
+
+**خيار Java (الموصى به للاختبار المتقدم):**
+```powershell
+# كرر هذا الأمر مع تغيير المنفذ (9001، 9002، 9003) واسم السيرفر في كل نافذة تيرمينال
+java -jar .\java-web-app\out\artifacts\simpleWebApp_v2.jar 9001 "Server_1"
 ```
-go-load-balancing/
-├── config.json # Load balancer configuration
-├── main.go # Entry point for the load balancer
-├── go.mod # Go module file
-├── loadbalancer/
-│ ├── config.go # Configuration parsing
-│ ├── healthcheck.go # Health check logic
-│ └── loadbalancer.go # Core load balancing logic
-└── templates/
-  └── 503.html # Custom 503 error page
+
+**خيار Go:**
+```powershell
+cd go-web-app
+go run main.go 9001 "Server_1"
+```
+
+### ثانياً: تشغيل موازنات الأحمال (Load Balancers)
+
+**تشغيل موازن Rust (الأقوى):**
+1. عدل ملف `config.yml` داخل المجلد لضبط السيرفرات والخوارزمية.
+2. نفذ الأمر:
+```powershell
+cd load-balncer-with-rust
+cargo run
+```
+
+**تشغيل موازن Go:**
+1. عدل ملف `config.json` لضبط المنافذ.
+2. نفذ الأمر:
+```powershell
+cd go-load-balancing
+go run main.go
 ```
 
 ---
 
-## Configuration
-Modify config.json to customize the load balancer:
-```
-{
-    "listenPort": ":9090",
-    "healthCheckInterval": "5s",
-    "servers": [
-        "http://localhost:9091",
-        "http://localhost:9092",
-        "http://localhost:9093"
-    ]
-}
-```
-listenPort: Port for the load balancer (e.g., :9090).
-healthCheckInterval: Frequency of health checks (e.g., 5s).
-servers: List of backend server URLs.
+## 🧪 اختبار الخوارزميات (Testing Guide)
 
-## Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/ahmadabdelbary2001/Load-Balancing.git
-   cd Load-Balancing/go-load-balancing
-   ```
+### اختبار Least Connections (عبر Java UI)
+1. افتح المتصفح على موازن الأحمال (مثلاً: `http://localhost:8000`).
+2. في خانة "Hold Connection"، أدخل **15** ثانية في Chrome واضغط Submit.
+3. افتح Edge فوراً وادخل لنفس الرابط؛ ستلاحظ أن الموازن نقلك لسيرفر مختلف لأن السيرفر الأول مشغول حالياً.
 
-2. Build and run:
-   ```bash
-   go run main.go
-   ```
+### اختبار الـ ACL (في نسخة Rust)
+- اطلب `http://localhost:8000/even`: سيتم توجيهك دائماً للسيرفر 2.
+- اطلب `http://localhost:8000/odd`: سيتم التوزيع بين السيرفر 1 و 3.
 
 ---
 
-## Running the Backend Servers
-For the load balancer to work properly, you need to run at least one backend server. We provide two sample implementations:
-
-### Option 1: Go Web Application
-1. Navigate to project directory
-2. Run with command:
-```bash
-go run main.go [PORT] "[SERVER_NAME]"
-```
-
-### Option 2: Java Web Application
-1. Navigate to project directory
-2. Ensure you have Java JRE installed
-3. Run with command:
-```bash
-java -jar .\out\artifacts\simpleWebApp_jar\simpleWebApp.jar [PORT] "[SERVER_NAME]"
-```
-
-## Important Notes:
-1. The load balancer will automatically detect healthy servers
-2. If no servers are running, you'll see the 503 error page
-3. You can mix Go and Java servers in your configuration
+## 🛠️ المتطلبات التقنية
+- **Rust**: 1.70+
+- **Go**: 1.21+
+- **Java**: JRE 17+
